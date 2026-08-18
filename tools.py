@@ -102,8 +102,13 @@ def _creator_row(creator):
         "median_views": int(creator["median_views"]),
         "median_views_display": as_count(creator["median_views"]),
         "median_engagement_rate": round(creator["median_engagement_rate"], 4),
-        "median_engagement_rate_display": as_percent(creator["median_engagement_rate"]),
+        "median_engagement_rate_display": as_percent(
+            round(creator["median_engagement_rate"], 4)
+        ),
         "engagement_score": round(creator["median_score"] * 100),
+        # The scale belongs in the payload. Without it, a narration that writes
+        # "84 out of 100" is quoting a number nothing gave it.
+        "engagement_score_display": f"{round(creator['median_score'] * 100)} out of 100",
         "verified": creator["verified"],
     }
 
@@ -262,8 +267,12 @@ def metric_by_segment(metric="median_engagement_rate", dimension="duration_bucke
         for name in METRIC_LABELS:
             if name not in segment:
                 continue
+            # Round FIRST, then format. Formatting the unrounded value while
+            # exposing the rounded one made the same rate read 7.3% in the
+            # table and 7.2% in the prose.
             value = segment[name]
-            row[name] = round(value, 4) if isinstance(value, float) else value
+            value = round(value, 4) if isinstance(value, float) else value
+            row[name] = value
             row[f"{name}_display"] = _display_metric(name, value)
         rows.append(row)
 
