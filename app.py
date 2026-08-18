@@ -335,11 +335,24 @@ def render_question_screen():
     else:
         st.caption("Pick a question above, or type your own.")
 
-    st.info(
-        "Offline mode: routing by keyword, narrating from templates. Set "
-        "ANTHROPIC_API_KEY to use the language model. Both modes call the same "
-        "tools and show the same figures."
-    )
+    render_mode_banner()
+
+
+def render_mode_banner():
+    """Say which path answered, and if it fell back, say why."""
+    reason = llm.last_fallback_reason()
+    if reason:
+        st.warning(
+            "Answered offline: routing by keyword, narrating from templates. "
+            "The language model was unavailable, so the same tools ran without "
+            f"it. Reason: {reason}"
+        )
+    else:
+        st.info(
+            "Offline mode: routing by keyword, narrating from templates. Set "
+            "ANTHROPIC_API_KEY to use the language model. Both modes call the "
+            "same tools and show the same figures."
+        )
 
 
 def main():
