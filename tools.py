@@ -287,6 +287,11 @@ def dataset_facts():
         n=facts["rows"],
         unit="videos",
         notes=[
+            # Someone will ask for an average. Views are skewed hard enough
+            # (mean 1,029,213 against median 82,500) that answering with one
+            # would mislead, so the payload says which it gave and why.
+            "Every figure here is a median, not an average. Views are skewed "
+            "enough that an average would describe no real video.",
             "There are no follower counts in this dataset. Reach is views only.",
             f"Of {facts['creators']:,} creators, "
             f"{shortlist['funnel']['qualifying']} clear all three bars and "
