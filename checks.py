@@ -1,6 +1,6 @@
 """Assert every invariant the brief depends on. Run after every change.
 
-Plain assertions, no pytest — the point is that `python checks.py` is one
+Plain assertions, no pytest. The point is that `python checks.py` is one
 command with an obvious exit code, not a test framework to configure.
 
 The expected values below are hardcoded on purpose. This is the file that
@@ -37,7 +37,7 @@ passed_checks = []
 
 def check(label, condition, detail=""):
     """Record a passing check, or fail loudly with the label and what went wrong."""
-    assert condition, f"{label} — {detail}"
+    assert condition, f"{label}: {detail}"
     passed_checks.append(label)
 
 
@@ -233,7 +233,7 @@ def check_no_means_on_display(tables):
     check(
         "no mean in dataset_facts",
         not mean_keys,
-        f"found {mean_keys} — median 82,500 vs mean 1,029,213 is why",
+        f"found {mean_keys}. Median 82,500 vs mean 1,029,213 is why.",
     )
 
 
@@ -253,7 +253,7 @@ def check_segment_ratios(tables):
 
 
 def provenance_check(narration, payload):
-    """Stub — implemented in Phase 8, once there is narration to check."""
+    """Stub. Implemented in Phase 8, once there is narration to check."""
     raise NotImplementedError("provenance_check arrives with the Q&A layer")
 
 
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     try:
         run_all()
     except AssertionError as failure:
-        print(f"CHECK FAILED — {failure}")
+        print(f"CHECK FAILED: {failure}")
         print(f"({len(passed_checks)} checks passed before the failure)")
         sys.exit(1)
 

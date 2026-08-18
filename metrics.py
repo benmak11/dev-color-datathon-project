@@ -1,8 +1,8 @@
 """Aggregate the per-video rows from `prep` into the five tables everything else reads.
 
 `build_tables()` is the only entry point. It returns plain JSON-safe dicts and
-lists — no pandas, no custom classes — because the Streamlit screens, the tool
-layer and the language model all consume the same object.
+lists. No pandas, no custom classes. The Streamlit screens, the tool layer and
+the language model all consume the same object.
 
 Two rules the numbers depend on:
 
@@ -12,7 +12,7 @@ Two rules the numbers depend on:
 *Three gates, applied in order.* A creator is promising if they posted at least
 2 videos in this batch, hold a median of 50,000+ views, and score above the
 batch median. The reach floor is a business-relevance filter, not a correction
-for small-account inflation — engagement rate is flat across view quintiles, so
+for small-account inflation. Engagement rate is flat across view quintiles, so
 there is no such inflation to correct.
 
 Run `python metrics.py` for a readable summary of the funnel and the tables.
@@ -28,6 +28,7 @@ GATE_MIN_VIDEOS = 2
 GATE_MIN_MEDIAN_VIEWS = 50_000
 
 SHORTLIST_PREVIEW_ROWS = 6
+TOP_HASHTAGS_SHOWN = 5
 
 # Dimensions the Q&A layer can segment by. duration_bucket reuses duration_table.
 TWO_GROUP_DIMENSIONS = ("verified", "music_is_original")
@@ -211,6 +212,10 @@ def build_dataset_facts(videos, batch_median_score):
         "batch_median_score": batch_median_score,
         "distinct_hashtags": len(set(hashtags)),
         "blank_hashtags": len(videos) - len(hashtags),
+        # Named on screen to justify not segmenting by topic: the most common
+        # tags are discovery tags, not themes. Counted here so the caption
+        # never hardcodes them.
+        "top_hashtags": Counter(hashtags).most_common(TOP_HASHTAGS_SHOWN),
         "duration_convention": prep.DURATION_CONVENTION,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
@@ -249,7 +254,7 @@ def summarise(tables):
     verified_row, unverified_row = verified_rows
 
     lines = [
-        f"metrics.py — aggregate tables from {facts['rows']:,} videos",
+        f"metrics.py: aggregate tables from {facts['rows']:,} videos",
         "",
         "  FUNNEL   "
         f"{funnel['creators']} {funnel['with_2plus']} "
@@ -292,7 +297,7 @@ def summarise(tables):
         f"   like rate {unverified_row['median_like_rate']:.3f}",
         f"    verified take {verified_row['ratios']['median_views']['text']} the views"
         f" but score {verified_row['ratios']['median_score']['text']} (i.e. lower)"
-        " — scale, not conversation",
+        ". Scale, not conversation.",
         "",
         f"  SHORTLIST  top {SHORTLIST_PREVIEW_ROWS} of each tier",
     ]
