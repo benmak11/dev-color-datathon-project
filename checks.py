@@ -269,6 +269,41 @@ def check_provenance(tables):
     )
 
 
+def check_docs_are_current(tables):
+    """The docs are generated, so the files on disk must match what code makes.
+
+    A README is where a stale number survives longest: nothing renders it, so
+    nothing catches it. Regenerating and comparing is the only way the figures
+    in prose stay tied to the data.
+    """
+    from pathlib import Path
+
+    import write_docs
+
+    for relative_path, builder in (
+        ("README.md", write_docs.build_readme),
+        ("docs/dataflow.md", write_docs.build_dataflow),
+    ):
+        path = Path(__file__).parent / relative_path
+        check(
+            f"{relative_path} exists",
+            path.exists(),
+            "run python write_docs.py",
+        )
+        check(
+            f"{relative_path} matches what write_docs.py generates",
+            path.read_text() == builder(tables),
+            "stale; run python write_docs.py",
+        )
+
+    dataflow = (Path(__file__).parent / "docs" / "dataflow.md").read_text()
+    check(
+        "the data flow sketch says pure Python, not pandas",
+        "pandas" not in dataflow,
+        "the compute step is stdlib only",
+    )
+
+
 def check_no_means_on_display(tables):
     """Views are skewed enough that a mean anywhere near a screen is a defect."""
     mean_keys = [key for key in tables["dataset_facts"] if "mean" in key.lower()]
@@ -457,6 +492,7 @@ def run_all():
     check_segment_ratios(tables)
     check_tool_payloads(tables)
     check_provenance(tables)
+    check_docs_are_current(tables)
 
     return tables
 
