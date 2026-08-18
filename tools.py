@@ -70,13 +70,39 @@ def _envelope(tool, filters, rows, n, unit, notes=None, **extra):
     return payload
 
 
+def as_percent(rate):
+    return f"{rate * 100:.1f}%"
+
+
+def as_count(value):
+    return f"{int(value):,}"
+
+
+def _display_metric(name, value):
+    if name in ("median_engagement_rate", "median_like_rate"):
+        return as_percent(value)
+    if name == "median_views":
+        return as_count(value)
+    if name == "median_score":
+        return f"{round(value * 100)} out of 100"
+    return str(value)
+
+
 def _creator_row(creator):
-    """The shape a creator takes when it appears in a list of results."""
+    """The shape a creator takes when it appears in a list of results.
+
+    Rates ship twice: the raw value, and a reader-ready string. The narration
+    layer may not convert anything, so without the second form it quotes
+    "0.0914" at a non-technical reader. Both are in the payload, so quoting the
+    readable one still passes the provenance check.
+    """
     return {
         "handle": creator["handle"],
         "n_videos": creator["n_videos"],
         "median_views": int(creator["median_views"]),
+        "median_views_display": as_count(creator["median_views"]),
         "median_engagement_rate": round(creator["median_engagement_rate"], 4),
+        "engagement_rate_display": as_percent(creator["median_engagement_rate"]),
         "engagement_score": round(creator["median_score"] * 100),
         "verified": creator["verified"],
     }
@@ -185,8 +211,11 @@ def creator_profile(handle):
         "tier": _tier_for(creator),
         "n_videos": creator["n_videos"],
         "median_views": int(creator["median_views"]),
+        "median_views_display": as_count(creator["median_views"]),
         "best_video_views": int(creator["best_video_views"]),
+        "best_video_views_display": as_count(creator["best_video_views"]),
         "median_engagement_rate": round(creator["median_engagement_rate"], 4),
+        "engagement_rate_display": as_percent(creator["median_engagement_rate"]),
         "engagement_score": round(creator["median_score"] * 100),
         "score_range": f"{scores_span[0]} to {scores_span[1]}",
         "verified": creator["verified"],
@@ -217,20 +246,26 @@ def metric_by_segment(metric="median_engagement_rate", dimension="duration_bucke
     segment_rows = TABLES["segment_tables"][dimension]
     labels = SEGMENT_GROUP_LABELS.get(dimension)
 
+    # Every row carries all four metrics, not just the requested one. Asked
+    # "are verified creators worth more?", a views-only payload plus a note
+    # mentioning engagement left a gap, and the model filled it with invented
+    # figures on 4 of 5 runs. The numbers were plausible enough to pass a human
+    # read. Leave no gap to fill.
     rows = []
     for segment in segment_rows:
         group = segment.get("bucket", segment.get("group"))
-        rows.append(
-            {
-                "group": labels[group] if labels else group,
-                "n_videos": segment["n_videos"],
-                metric: (
-                    round(segment[metric], 4)
-                    if isinstance(segment[metric], float)
-                    else segment[metric]
-                ),
-            }
-        )
+        row = {
+            "group": labels[group] if labels else group,
+            "n_videos": segment["n_videos"],
+            "requested_metric": metric,
+        }
+        for name in METRIC_LABELS:
+            if name not in segment:
+                continue
+            value = segment[name]
+            row[name] = round(value, 4) if isinstance(value, float) else value
+            row[f"{name}_display"] = _display_metric(name, value)
+        rows.append(row)
 
     # Two-group dimensions carry the multiple as text, so the model never divides.
     ratio_text = None
@@ -273,7 +308,9 @@ def dataset_facts():
         "date_max": facts["date_max"],
         "total_views": facts["total_views"],
         "median_views": int(facts["median_views"]),
+        "median_views_display": as_count(facts["median_views"]),
         "median_engagement_rate": round(facts["median_engagement_rate"], 4),
+        "median_engagement_rate_display": as_percent(facts["median_engagement_rate"]),
         "creators_with_2plus_videos": shortlist["funnel"]["with_2plus"],
         "creators_clearing_reach_floor": shortlist["funnel"]["clearing_reach_floor"],
         "creators_qualifying": shortlist["funnel"]["qualifying"],
