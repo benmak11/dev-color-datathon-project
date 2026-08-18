@@ -1,4 +1,4 @@
-"""Ten questions with hand-checked answers. Run before any demo.
+"""Ten questions with hand-checked answers, end to end through the answer path.
 
 This tests routing and provenance, not wording. The model phrases things
 differently every run, so asserting on prose would fail for the wrong reason.
@@ -9,14 +9,15 @@ The first four questions are the chips on the question screen. The demo script
 and the regression test are the same list, which is why neither gets skipped
 when the clock runs out.
 
-Run `python golden.py` for both modes, or `python golden.py offline` for the
-path that needs no API key.
+Offline mode needs no API key and runs as part of `python -m tests`. Run
+`python -m tests.golden anthropic` to exercise the live model as well, or
+`python -m tests.golden` for both.
 """
 
 import sys
 
-import checks
-import llm
+from core import llm
+from core.provenance import provenance_check
 
 Case = tuple  # (question, expected_tool, expected_n, fact_that_must_be_present)
 
@@ -46,10 +47,10 @@ GOLDEN_SET = [
 
 
 def check_case(question, expected_tool, expected_n, fact, mode):
-    """Return (passed, failures) for one question in one mode."""
+    """Return (passed, failures, result) for one question in one mode."""
     result = llm.answer(question, mode=mode)
     payload = result.payload
-    verified, unbacked = checks.provenance_check(result.prose, payload)
+    verified, unbacked = provenance_check(result.prose, payload)
     failures = []
 
     if result.call.name != expected_tool:
@@ -67,23 +68,38 @@ def check_case(question, expected_tool, expected_n, fact, mode):
     return not failures, failures, result
 
 
-def run(mode):
-    print(f"\n{mode.upper()} MODE")
-    print("-" * 78)
+def run(mode, verbose=True):
+    """Run the whole set in one mode. Returns True when all ten pass."""
+    if verbose:
+        print(f"\n{mode.upper()} MODE")
+        print("-" * 78)
     passed = 0
 
     for index, (question, tool, sample, fact) in enumerate(GOLDEN_SET, start=1):
         ok, failures, result = check_case(question, tool, sample, fact, mode)
         passed += ok
-        status = "PASS" if ok else "FAIL"
-        print(f"{status}  {index:>2}. {question}")
-        print(f"          {result.call.name}, n={result.payload['n']}")
-        for failure in failures:
-            print(f"          -> {failure}")
+        if verbose:
+            status = "PASS" if ok else "FAIL"
+            print(f"{status}  {index:>2}. {question}")
+            print(f"          {result.call.name}, n={result.payload['n']}")
+            for failure in failures:
+                print(f"          -> {failure}")
 
-    print("-" * 78)
-    print(f"{passed}/{len(GOLDEN_SET)} passed in {mode} mode")
+    if verbose:
+        print("-" * 78)
+        print(f"{passed}/{len(GOLDEN_SET)} passed in {mode} mode")
     return passed == len(GOLDEN_SET)
+
+
+def check_all():
+    """The offline path, for the main suite. No API key, no network."""
+    from tests.runner import check
+
+    check(
+        "all ten golden questions pass offline",
+        run("offline", verbose=False),
+        "run python -m tests.golden offline to see which",
+    )
 
 
 if __name__ == "__main__":

@@ -10,15 +10,16 @@ around an interpolated value splits a sentence at whatever column the number
 happens to end on, which reads badly in the source and shifts every time the
 data moves. Markdown renders both forms identically.
 
-Run `python write_docs.py` after any change to the data or the metrics.
+Run `python -m scripts.write_docs` from the project root after any change to
+the data or the metrics.
 """
 
-from pathlib import Path
+from core.paths import PROJECT_ROOT
 
-import metrics
-import prep
+from core import metrics
+from core import prep
 
-ROOT = Path(__file__).parent
+ROOT = PROJECT_ROOT
 
 MONTHS = {
     "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun",
@@ -64,11 +65,19 @@ Two screens, selected from the sidebar.
 
 ```
 uv venv --python 3.12 .venv
-uv pip install streamlit anthropic
+uv pip install -r requirements.txt
 .venv/bin/streamlit run app.py
 ```
 
-Then `python checks.py` and `python golden.py` before any demo. The first asserts the dataset invariants, the second runs ten hand checked questions through both answer paths.
+`requirements.txt` holds two pinned packages, both for the app layer. The metrics core in `core/` is standard library only, so the test suite runs under a bare interpreter.
+
+Then run the test suite before any demo:
+
+```
+python -m tests
+```
+
+That is one command and an obvious exit code. It asserts the dataset invariants, the tool contract, the provenance guard, that the generated documents still match the data, and that all ten golden questions answer correctly offline. Add the live model path with `python -m tests.golden anthropic`, which needs a key.
 
 ## Using the language model
 
@@ -99,20 +108,45 @@ If the key is missing, malformed or a call fails, the screen falls back to the k
 
 **The Anthropic Messages API** for routing and narration, through tool use. The model is handed five typed function schemas and must call one of them. Declining is one of the five, so refusal is a routing outcome rather than a keyword filter sitting in front of the model.
 
-**Plain assertions as the test suite.** `checks.py` is a list of asserts and an exit code, no pytest. `golden.py` pins ten questions to the tool each should reach, the sample size it should report, and a hand checked fact that must appear.
+**Plain assertions as the test suite.** `tests/` is a list of asserts and an exit code, no pytest. Each module owns one concern, and the golden set pins ten questions to the tool each should reach, the sample size it should report, and a hand checked fact that must appear.
 
-**Generated documentation.** This file, the script and the data flow sketch are written by `write_docs.py` from the computed tables. `checks.py` fails if any of the three drifts from the data, so a number cannot go stale in prose.
+**GitHub Actions** runs the whole suite on every push and pull request, including a headless boot of the app. No API key is needed, because the offline answer path is what CI exercises.
 
-## Files
+**Generated documentation.** This file, the script and the data flow sketch are written by `scripts/write_docs.py` from the computed tables. The suite fails if any of the three drifts from the data, so a number cannot go stale in prose.
 
-* `prep.py` loads the export and derives the per video rates and scores
-* `metrics.py` aggregates everything into five tables
-* `tools.py` exposes five typed functions over those tables
-* `llm.py` routes a question to one tool and narrates the result
-* `checks.py` asserts the invariants and verifies figures in answers
-* `golden.py` runs ten hand checked questions through both answer paths
-* `app.py` renders the two screens
-* `write_docs.py` regenerates the three documents
+## Layout
+
+```
+.
+├── app.py                  Streamlit entry point, both screens
+├── requirements.txt        two pinned packages, app layer only
+├── core/                   everything that produces a number. No Streamlit, no pandas
+│   ├── paths.py            project paths, resolved once
+│   ├── prep.py             load the export, derive per video rates and scores
+│   ├── metrics.py          aggregate into the five tables
+│   ├── tools.py            five typed functions over those tables
+│   ├── llm.py              route a question to one tool, narrate the result
+│   └── provenance.py       check every figure in an answer against its source
+├── tests/                  the suite. Run with python -m tests
+│   ├── expectations.py     the numbers the code is held to
+│   ├── runner.py           the check helper and the reporting
+│   ├── source_data.py      the export: counts, dates, uniqueness
+│   ├── percentiles.py      the ranking, recomputed value by value
+│   ├── aggregates.py       scores, buckets, creators, the funnel
+│   ├── tool_payloads.py    the envelope every tool must return
+│   ├── provenance.py       the guard that catches an invented figure
+│   ├── documentation.py    the generated docs still match the data
+│   └── golden.py           ten questions end to end
+├── scripts/
+│   └── write_docs.py       regenerates the three documents
+├── docs/
+│   ├── script.md           the reasoning behind the brief
+│   └── dataflow.md         how a question becomes an answer
+├── data/                   the export
+└── .github/workflows/      continuous integration
+```
+
+The dependency direction runs one way. `core` imports nothing above it, `tests` and `scripts` import `core`, and `app.py` imports `core` and nothing else in the project. `provenance.py` lives in `core` rather than in `tests` because it runs on every answer the app renders, so it is production code that the suite happens to test.
 
 ## Further reading
 

@@ -13,13 +13,13 @@ the routing differ.
 import os
 import re
 from collections import namedtuple
-from pathlib import Path
+from core.paths import ENV_FILE
 
-import tools
+from core import tools
 
 # The key lives in .env, not the shell, so nothing else on the machine inherits
 # it. os.environ.setdefault means a real exported variable always wins.
-_ENV_FILE = Path(__file__).parent / ".env"
+_ENV_FILE = ENV_FILE
 if _ENV_FILE.exists():
     for _line in _ENV_FILE.read_text().splitlines():
         if _line.strip() and not _line.startswith("#") and "=" in _line:

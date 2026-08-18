@@ -22,7 +22,7 @@ import statistics
 from collections import Counter
 from datetime import datetime
 
-import prep
+from core import prep
 
 GATE_MIN_VIDEOS = 2
 GATE_MIN_MEDIAN_VIEWS = 50_000
