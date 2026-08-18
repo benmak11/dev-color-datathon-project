@@ -280,10 +280,7 @@ def check_docs_are_current(tables):
 
     import write_docs
 
-    for relative_path, builder in (
-        ("README.md", write_docs.build_readme),
-        ("docs/dataflow.md", write_docs.build_dataflow),
-    ):
+    for relative_path, builder in write_docs.DOCUMENTS:
         path = Path(__file__).parent / relative_path
         check(
             f"{relative_path} exists",
@@ -301,6 +298,11 @@ def check_docs_are_current(tables):
         "the data flow sketch says pure Python, not pandas",
         "pandas" not in dataflow,
         "the compute step is stdlib only",
+    )
+    check(
+        "the data flow sketch draws the five steps as a mermaid chart",
+        "```mermaid" in dataflow and dataflow.count("VERIFY") >= 2,
+        "the diagram is the point of this file; both verify branches must be drawn",
     )
 
 
