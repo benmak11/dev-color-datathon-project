@@ -10,6 +10,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import checks
 import llm
 import metrics
 import prep
@@ -286,27 +287,58 @@ def set_pending_question(question):
     st.session_state.question_input = question
 
 
+def answer_table(payload):
+    """The source rows, with the raw and display forms of each figure merged."""
+    frame = pd.DataFrame(payload["rows"])
+    # Display columns exist for the model's benefit. Beside the raw column they
+    # are duplicates, so prefer them and drop the raw twin.
+    for column in [c for c in frame.columns if c.endswith("_display")]:
+        frame[column[: -len("_display")]] = frame[column]
+        frame = frame.drop(columns=[column])
+    frame = frame.drop(columns=[c for c in ("requested_metric",) if c in frame])
+    frame.columns = [c.replace("_", " ").capitalize() for c in frame.columns]
+    return frame
+
+
 def render_answer(question):
     result = llm.answer(question)
     payload = result.payload
+    verified, unbacked = checks.provenance_check(result.prose, payload)
 
-    st.markdown(f"**{result.prose}**")
+    # Fail closed. During live testing the model invented figures that read as
+    # correct, so an unverifiable sentence is withheld rather than shown with a
+    # caveat nobody would notice.
+    if verified:
+        st.markdown(f"**{result.prose}**")
+    else:
+        st.warning(
+            "I can't verify one of the figures in that answer, so here's the "
+            "data instead."
+        )
+
     if payload["rows"]:
-        frame = pd.DataFrame(payload["rows"])
-        frame.columns = [
-            column.replace("_", " ").capitalize() for column in frame.columns
-        ]
-        st.dataframe(frame, hide_index=True)
+        st.dataframe(answer_table(payload), hide_index=True)
 
     with st.expander("Where this answer came from"):
+        if verified:
+            st.markdown("✅ Every figure above was read straight from this table.")
+        else:
+            st.markdown(
+                "⚠️ Withheld the summary: "
+                f"{', '.join(f'`{token}`' for token in unbacked)} "
+                "did not appear in the data behind it."
+            )
         st.markdown(
             f"Question routed to `{result.call.name}` "
             f"with `{result.call.arguments or 'no arguments'}`. "
-            f"Sample size: **{payload['n'] if payload['n'] is not None else 'not applicable'}** "
+            f"Sample size: "
+            f"**{payload['n'] if payload['n'] is not None else 'not applicable'}** "
             f"{payload['unit']}."
         )
         for note in payload["notes"]:
             st.caption(note)
+
+    return result.mode
 
 
 def render_question_screen():
@@ -331,15 +363,26 @@ def render_question_screen():
     )
 
     if question:
-        render_answer(question)
+        render_mode_banner(render_answer(question))
     else:
         st.caption("Pick a question above, or type your own.")
 
-    render_mode_banner()
 
+def render_mode_banner(mode):
+    """Say which path actually answered. Never guess it.
 
-def render_mode_banner():
-    """Say which path answered, and if it fell back, say why."""
+    The first version inferred the mode from whether a fallback had been
+    recorded, and told the reader it was in offline mode while the model was
+    answering. A banner about trustworthiness has to be right about itself.
+    """
+    if mode == "anthropic":
+        st.caption(
+            "Answered by the language model: it chose which prepared question "
+            "to run and explained the result. The figures come from the table "
+            "above, and each one was checked against it."
+        )
+        return
+
     reason = llm.last_fallback_reason()
     if reason:
         st.warning(

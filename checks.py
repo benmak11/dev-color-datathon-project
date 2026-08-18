@@ -13,6 +13,7 @@ The source architecture doc claimed a funnel of 802 -> 91 -> 76 -> 47. The real
 answer is 74 and 45. That transcription error is why this file exists.
 """
 
+import re
 import statistics
 import sys
 from collections import Counter, defaultdict
@@ -227,6 +228,47 @@ def check_funnel_and_shortlist(tables):
     )
 
 
+def check_provenance(tables):
+    """The check must pass real prose and catch the fabrication we actually saw."""
+    import tools
+
+    facts = tools.REGISTRY["dataset_facts"]()
+    check(
+        "provenance passes figures drawn from the payload",
+        provenance_check("There are 802 creators in 1,000 videos.", facts)[0],
+        "a legitimate sentence was rejected",
+    )
+    check(
+        "provenance catches an invented figure",
+        provenance_check("There are 803 creators.", facts) == (False, ["803"]),
+        "a wrong number slipped through",
+    )
+
+    segment = tools.REGISTRY["metric_by_segment"](
+        metric="median_views", dimension="verified"
+    )
+    # The live model wrote this. The multiple is its own arithmetic, and no
+    # amount of prompt instruction stopped it.
+    ok, unbacked = provenance_check(
+        "verified creators show 11.7% versus 8.7%, a 1.33x difference.", segment
+    )
+    check(
+        "provenance catches the multiple the model computed itself",
+        not ok and "1.33" in unbacked,
+        f"got {unbacked}",
+    )
+    check(
+        "rates are not auto-expanded into percentages",
+        _normalise("11.7") in payload_numbers(segment),
+        "display strings should supply the readable form, not an expansion rule",
+    )
+    check(
+        "date digits in payload strings are allowed",
+        provenance_check("Covers 22 Sep to 21 Dec 2020.", facts)[0],
+        "dates come from the payload's own strings",
+    )
+
+
 def check_no_means_on_display(tables):
     """Views are skewed enough that a mean anywhere near a screen is a defect."""
     mean_keys = [key for key in tables["dataset_facts"] if "mean" in key.lower()]
@@ -331,9 +373,74 @@ def check_tool_payloads(tables):
     )
 
 
+NUMBER_PATTERN = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def _normalise(token):
+    """'1,000' and '1000' are the same number. '9.10' and '9.1' are too."""
+    token = token.replace(",", "")
+    if "." in token:
+        token = token.rstrip("0").rstrip(".")
+    return token or "0"
+
+
+def _forms_of(value):
+    """The ways a writer might reasonably render one payload number."""
+    forms = {str(value), f"{value:,}"}
+    if isinstance(value, float):
+        forms |= {
+            f"{value:.0f}",
+            f"{value:.1f}",
+            f"{value:.2f}",
+            f"{value:,.0f}",
+            f"{value:,.1f}",
+        }
+    return {_normalise(form) for form in forms}
+
+
+def payload_numbers(payload):
+    """Every number the payload actually contains, in every renderable form.
+
+    Deliberately does NOT expand a rate into its percentage. Payloads ship a
+    `_display` string for every rate, so the readable form is already present
+    as text. Auto-expanding would widen the allowed set enough to let an
+    invented figure through, which is the one thing this check exists to stop.
+    """
+    allowed = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+        elif isinstance(node, bool):
+            pass  # bools are ints in Python; they are not figures
+        elif isinstance(node, (int, float)):
+            allowed.update(_forms_of(node))
+        elif isinstance(node, str):
+            for token in NUMBER_PATTERN.findall(node):
+                allowed.add(_normalise(token))
+
+    walk(payload)
+    return allowed
+
+
 def provenance_check(narration, payload):
-    """Stub. Implemented in Phase 8, once there is narration to check."""
-    raise NotImplementedError("provenance_check arrives with the Q&A layer")
+    """Return (ok, unbacked_tokens) for one narrated answer.
+
+    The model is instructed never to invent a number. During live testing it
+    did anyway, on 4 of 5 runs, with figures close enough to the truth to read
+    as correct. An instruction is not a mechanism. This is the mechanism.
+    """
+    allowed = payload_numbers(payload)
+    unbacked = [
+        token
+        for token in NUMBER_PATTERN.findall(narration)
+        if _normalise(token) not in allowed
+    ]
+    return not unbacked, unbacked
 
 
 def run_all():
@@ -349,6 +456,7 @@ def run_all():
     check_no_means_on_display(tables)
     check_segment_ratios(tables)
     check_tool_payloads(tables)
+    check_provenance(tables)
 
     return tables
 

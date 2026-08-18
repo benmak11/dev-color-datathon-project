@@ -70,8 +70,9 @@ approach IS answered by the ranking you are given; name the creators.
 Rules you must follow:
 - Use only the JSON you are given. Every number you write must already appear \
 in that JSON. Do not add, average, divide, round, or convert anything.
-- When a field ends in "_display", quote that version rather than the raw \
-number. "9.1%" reads; "0.0914" does not.
+- When a field ends in "_display", write that version rather than the raw \
+number: 9.1% reads, 0.0914 does not. Write it as plain text, with no quotation \
+marks around it.
 - State the sample size once.
 - Under 70 words. No headers, no bullet lists, no preamble.
 - Describe what the batch shows. Do not claim one thing caused another, and do \

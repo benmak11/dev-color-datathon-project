@@ -102,7 +102,7 @@ def _creator_row(creator):
         "median_views": int(creator["median_views"]),
         "median_views_display": as_count(creator["median_views"]),
         "median_engagement_rate": round(creator["median_engagement_rate"], 4),
-        "engagement_rate_display": as_percent(creator["median_engagement_rate"]),
+        "median_engagement_rate_display": as_percent(creator["median_engagement_rate"]),
         "engagement_score": round(creator["median_score"] * 100),
         "verified": creator["verified"],
     }
@@ -215,7 +215,7 @@ def creator_profile(handle):
         "best_video_views": int(creator["best_video_views"]),
         "best_video_views_display": as_count(creator["best_video_views"]),
         "median_engagement_rate": round(creator["median_engagement_rate"], 4),
-        "engagement_rate_display": as_percent(creator["median_engagement_rate"]),
+        "median_engagement_rate_display": as_percent(creator["median_engagement_rate"]),
         "engagement_score": round(creator["median_score"] * 100),
         "score_range": f"{scores_span[0]} to {scores_span[1]}",
         "verified": creator["verified"],
