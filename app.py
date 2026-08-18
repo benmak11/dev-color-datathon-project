@@ -10,10 +10,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-import checks
-import llm
-import metrics
-import prep
+from core import llm, metrics, prep, provenance
 
 SHORTLIST_ROWS_PER_TIER = 6
 RECOMMENDED_BUCKET = "30-60s"
@@ -303,7 +300,7 @@ def answer_table(payload):
 def render_answer(question):
     result = llm.answer(question)
     payload = result.payload
-    verified, unbacked = checks.provenance_check(result.prose, payload)
+    verified, unbacked = provenance.provenance_check(result.prose, payload)
 
     # Fail closed. During live testing the model invented figures that read as
     # correct, so an unverifiable sentence is withheld rather than shown with a

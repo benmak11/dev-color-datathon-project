@@ -12,7 +12,7 @@ the difference has to survive the trip to the model.
 
 import difflib
 
-import metrics
+from core import metrics
 
 SUGGESTION_LIMIT = 3
 SUGGESTION_CUTOFF = 0.6

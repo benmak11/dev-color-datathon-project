@@ -14,9 +14,9 @@ Run `python prep.py` for a readable summary of what was loaded.
 import csv
 import statistics
 from collections import Counter
-from pathlib import Path
+from core.paths import DATA_FILE
 
-DATA_PATH = Path(__file__).parent / "data" / "2026datathon_interview_data.csv"
+DATA_PATH = DATA_FILE
 
 INTEGER_COLUMNS = ("views", "likes", "comments", "shares", "duration_sec")
 BOOLEAN_COLUMNS = ("author_verified", "music_is_original")

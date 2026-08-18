@@ -1,0 +1,83 @@
+name: CI
+
+# Everything here runs without an API key. The offline answer path is a first
+# class path, not a fallback, so CI exercises exactly what a reviewer who
+# clones this repo will see.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Metrics core imports without Streamlit or pandas
+        # The core is stdlib only by design. If an import creeps in, the
+        # correctness path stops being testable on its own, so fail here
+        # rather than discover it later.
+        run: |
+          python - <<'PY'
+          import sys
+          from core import llm, metrics, prep, provenance, tools
+          leaked = [name for name in ("pandas", "streamlit", "altair") if name in sys.modules]
+          assert not leaked, f"the metrics core pulled in {leaked}"
+          print("core is clean:", sorted(m for m in sys.modules if m.startswith("core")))
+          PY
+
+      - name: Test suite
+        # Invariants, tool contract, provenance guard, generated docs, and all
+        # ten golden questions through the offline answer path.
+        run: python -m tests
+
+      - name: Golden set, offline path in full
+        # Same ten questions, printed one per line so a CI failure names the
+        # question that broke rather than only the count.
+        run: python -m tests.golden offline
+
+      - name: Documentation is generated, not typed
+        # `python -m tests` already compares the files to the generator. This
+        # step proves the generator runs clean from a cold checkout and leaves
+        # the tree unchanged.
+        run: |
+          python -m scripts.write_docs
+          git diff --exit-code -- README.md docs/
+
+      - name: App boots headless
+        # Nothing else imports app.py, so without this a broken Streamlit
+        # screen ships green. Boot it and require a 200.
+        run: |
+          streamlit run app.py \
+            --server.headless true \
+            --server.port 8501 \
+            --browser.gatherUsageStats false &
+          for attempt in $(seq 1 30); do
+            if curl -sf http://localhost:8501/_stcore/health > /dev/null; then
+              echo "app healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "app did not come up within 30s"
+          exit 1

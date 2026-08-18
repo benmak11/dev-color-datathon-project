@@ -1,0 +1,15 @@
+# Two direct dependencies, both for the app layer only.
+#
+# The metrics core in `core/` is standard library only and imports neither of
+# these. CI asserts that, so `python -m tests` stays runnable under a bare
+# interpreter.
+#
+# altair and pandas arrive with streamlit and are not listed here. altair draws
+# the one chart and pandas only ever holds a table on its way to the screen.
+# Nothing in `core/` imports either.
+#
+# Pinned to the versions this was built and verified against. Loosen when you
+# next test it, not before.
+
+streamlit==1.61.1
+anthropic==0.122.0
