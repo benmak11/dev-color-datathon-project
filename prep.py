@@ -2,11 +2,11 @@
 
 Duration buckets are lower-bound inclusive and upper-bound exclusive, with the
 last bucket closed: 4-9s, 10-19s, 20-29s, 30-60s. That convention is what makes
-"169 videos run 30s or longer" true, and it is quotable on screen as-is.
+"169 videos run 30s or longer" true. It is quotable on screen as-is.
 
 Engagement is 96.8% likes in this batch, so a raw like+comment+share rate is a
 like rate in disguise. Each rate is percentile-ranked separately and the three
-ranks are averaged; that blend is `score`.
+ranks are averaged. That blend is `score`.
 
 Run `python prep.py` for a readable summary of what was loaded.
 """
@@ -42,7 +42,7 @@ def percentile_rank(values):
 
     Comment and share rates tie often, so tied videos must share a rank rather
     than being split by input order. A tied lowest group therefore averages
-    slightly above 0.0 — that is correct, not a bug.
+    slightly above 0.0. That is correct, not a bug.
     """
     value_count = len(values)
     indices_low_to_high = sorted(range(value_count), key=lambda index: values[index])
@@ -127,7 +127,7 @@ def summarise(videos):
 
     return "\n".join(
         [
-            f"prep.py — per-video metrics from {DATA_PATH.name}",
+            f"prep.py: per-video metrics from {DATA_PATH.name}",
             "",
             f"  videos loaded               {len(videos):,}",
             f"  distinct creators           {len({v['author_name'] for v in videos}):,}",

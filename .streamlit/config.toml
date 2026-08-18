@@ -1,0 +1,10 @@
+[theme]
+# Pinned rather than following the viewer's OS setting: the chart's colours are
+# validated against a specific surface, and a brief that silently changes
+# background between machines is one more thing to check before a demo.
+base = "light"
+# Matches the chart's accent step, so the shortlist's score bars and the chart
+# read as one system. Streamlit's default primary is red. That is a reserved
+# status colour, and it must never encode a series value like an engagement
+# score.
+primaryColor = "#3987e5"
