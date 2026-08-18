@@ -10,11 +10,21 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import llm
 import metrics
 import prep
 
 SHORTLIST_ROWS_PER_TIER = 6
 RECOMMENDED_BUCKET = "30-60s"
+
+# One per tool, and the first four items of the golden set. The demo script and
+# the regression test are the same list, so neither gets skipped.
+QUESTION_CHIPS = [
+    "Which creators get the most engagement?",
+    "Does video length matter?",
+    "Are verified creators worth more?",
+    "Tell me about papaswolio",
+]
 
 SHORTLIST_ROW_HEIGHT = 30
 SHORTLIST_TABLE_HEIGHT = SHORTLIST_ROW_HEIGHT * (SHORTLIST_ROWS_PER_TIER * 2 + 1) + 6
@@ -272,12 +282,63 @@ def render_summary_screen(tables):
     render_scope(tables)
 
 
+def set_pending_question(question):
+    st.session_state.question_input = question
+
+
+def render_answer(question):
+    result = llm.answer(question)
+    payload = result.payload
+
+    st.markdown(f"**{result.prose}**")
+    if payload["rows"]:
+        frame = pd.DataFrame(payload["rows"])
+        frame.columns = [
+            column.replace("_", " ").capitalize() for column in frame.columns
+        ]
+        st.dataframe(frame, hide_index=True)
+
+    with st.expander("Where this answer came from"):
+        st.markdown(
+            f"Question routed to `{result.call.name}` "
+            f"with `{result.call.arguments or 'no arguments'}`. "
+            f"Sample size: **{payload['n'] if payload['n'] is not None else 'not applicable'}** "
+            f"{payload['unit']}."
+        )
+        for note in payload["notes"]:
+            st.caption(note)
+
+
 def render_question_screen():
-    st.markdown("### Ask a follow-up")
+    """Screen 2. Same tables as the summary, reached by asking."""
+    st.markdown("#### Ask a follow-up")
+    st.caption(
+        "Answers come from the same prepared tables behind the summary. The "
+        "question picks which table to read. Nothing is calculated on the fly."
+    )
+
+    # Chips, not a bare text box. She has 20 minutes and will not invent prompts.
+    for column, chip in zip(st.columns(len(QUESTION_CHIPS)), QUESTION_CHIPS):
+        column.button(
+            chip,
+            use_container_width=True,
+            on_click=set_pending_question,
+            args=(chip,),
+        )
+
+    question = st.text_input(
+        "Or ask your own", key="question_input", placeholder="Type a question"
+    )
+
+    if question:
+        render_answer(question)
+    else:
+        st.caption("Pick a question above, or type your own.")
+
     st.info(
-        "The plain-English Q&A flow arrives in the next phase. It will answer from "
-        "the same prepared tables behind the summary. The model picks which question "
-        "to run and explains the result. It never does the arithmetic."
+        "Offline mode: routing by keyword, narrating from templates. Set "
+        "ANTHROPIC_API_KEY to use the language model. Both modes call the same "
+        "tools and show the same figures."
     )
 
 
