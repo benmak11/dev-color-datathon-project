@@ -100,10 +100,14 @@ REFUSAL_RULES = [
      "this dataset has no audience demographics"),
     (r"rate card|fee|price|cost|revenue|earn|paid|salary|budget",
      "this dataset has no fees, rates or revenue"),
+    # Prediction is checked before the date rule. "Who will blow up next year?"
+    # matches both, and the useful answer is that nothing here predicts, not
+    # that the export ends in December.
+    (r"will (they|he|she|it|this)|who will|going to|predict|forecast|blow up|grow into",
+     "nothing here can predict future performance, only describe what already "
+     "trended"),
     (r"20(2[1-9]|[3-9][0-9])|next year|today|currently|right now|latest",
      "this dataset stops in December 2020"),
-    (r"will (they|he|she|it|this)|going to|predict|forecast|blow up|grow into",
-     "this dataset cannot predict future performance"),
     (r"\bwhy\b", "this dataset shows what happened, not why"),
     (r"topic|theme|niche|category|what are they (posting|making) about",
      "this dataset has no content topic labels, only generic discovery hashtags"),
@@ -367,14 +371,17 @@ def narrate(question, payload):
     return text.strip()
 
 
-def answer(question):
+def answer(question, mode="auto"):
     """Route, compute, narrate. The one entry point the screen calls.
 
     Any failure at all falls through to the offline path: no key, a bad model
     id, a timeout, a rate limit, a refusal. The reader still gets an answer
     backed by the same numbers, and the banner says which path produced it.
+
+    `mode` is "auto" everywhere except the golden set, which pins each mode so
+    both paths are tested rather than whichever one happens to be reachable.
     """
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if mode != "offline" and os.environ.get("ANTHROPIC_API_KEY"):
         try:
             call = route(question)
             payload = tools.REGISTRY[call.name](**call.arguments)
