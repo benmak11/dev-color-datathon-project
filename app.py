@@ -338,7 +338,7 @@ def render_answer(question):
         for note in payload["notes"]:
             st.caption(note)
 
-    return result.mode
+    return result.mode, bool(payload["rows"])
 
 
 def render_question_screen():
@@ -363,12 +363,12 @@ def render_question_screen():
     )
 
     if question:
-        render_mode_banner(render_answer(question))
+        render_mode_banner(*render_answer(question))
     else:
         st.caption("Pick a question above, or type your own.")
 
 
-def render_mode_banner(mode):
+def render_mode_banner(mode, has_rows=True):
     """Say which path actually answered. Never guess it.
 
     The first version inferred the mode from whether a fallback had been
@@ -376,10 +376,18 @@ def render_mode_banner(mode):
     answering. A banner about trustworthiness has to be right about itself.
     """
     if mode == "anthropic":
+        # A refusal has no table, so the banner must not claim one. On a screen
+        # about where figures come from, a caption that overstates its own
+        # evidence is the wrong thing to get sloppy about.
+        provenance = (
+            "The figures come from the table above, and each one was checked "
+            "against it."
+            if has_rows
+            else "It declined because this dataset does not hold that."
+        )
         st.caption(
             "Answered by the language model: it chose which prepared question "
-            "to run and explained the result. The figures come from the table "
-            "above, and each one was checked against it."
+            f"to run and explained the result. {provenance}"
         )
         return
 
